@@ -273,3 +273,26 @@ func TestDetectStream(t *testing.T) {
 		},
 	}, events)
 }
+
+func TestDetectExactWindow(t *testing.T) {
+	cfg := DetectorConfig{
+		ModelPath:  "../testfiles/silero_vad.onnx",
+		SampleRate: 16000,
+		Threshold:  0.5,
+	}
+
+	sd, err := NewDetector(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, sd)
+	defer func() {
+		require.NoError(t, sd.Destroy())
+	}()
+
+	samples := readSamplesFromFile(t, "../testfiles/samples.pcm")
+	windowSize := windowSizeForSampleRate(cfg.SampleRate)
+	require.GreaterOrEqual(t, len(samples), windowSize)
+
+	segments, err := sd.Detect(samples[:windowSize])
+	require.NoError(t, err)
+	require.NotNil(t, segments)
+}

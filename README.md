@@ -17,6 +17,50 @@
 - ONNX Runtime (v1.18.1)
 - A [Silero VAD](https://github.com/snakers4/silero-vad) model (v5)
 
+### Usage
+
+The detector accepts mono PCM samples as `[]float32` in little-endian format.
+
+```go
+cfg := speech.DetectorConfig{
+  ModelPath:  "/path/to/silero_vad.onnx",
+  SampleRate: 16000,
+  Threshold:  0.5,
+}
+
+sd, err := speech.NewDetector(cfg)
+if err != nil {
+  log.Fatal(err)
+}
+defer sd.Destroy()
+
+// Batch detection.
+segments, err := sd.Detect(samples)
+if err != nil {
+  log.Fatal(err)
+}
+_ = segments
+
+// Streaming detection.
+// DetectStream emits start events (SpeechEndAt == 0) and end events.
+for _, chunk := range chunks {
+  updates, err := sd.DetectStream(chunk)
+  if err != nil {
+    log.Fatal(err)
+  }
+  for _, seg := range updates {
+    fmt.Printf("start=%.3f end=%.3f\n", seg.SpeechStartAt, seg.SpeechEndAt)
+  }
+}
+```
+
+### Examples
+
+- `examples/stream_file`: stream a PCM file from disk and run VAD on each chunk.
+  ```sh
+  go run ./examples/stream_file -model ./testfiles/silero_vad.onnx -pcm ./testfiles/samples.pcm
+  ```
+
 ### Development
 
 In order to build and/or run this library, you need to export (or pass) some env variables to point to the ONNX runtime files.
