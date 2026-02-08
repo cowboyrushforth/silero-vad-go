@@ -60,9 +60,9 @@ func main() {
 	buf := make([]byte, chunkSize*bytesPerSample)
 
 	for {
-		n, err := io.ReadFull(reader, buf)
-		if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
-			log.Fatal(err)
+		n, readErr := io.ReadFull(reader, buf)
+		if readErr != nil && readErr != io.ErrUnexpectedEOF && readErr != io.EOF {
+			log.Fatal(readErr)
 		}
 
 		if n == 0 {
@@ -74,9 +74,9 @@ func main() {
 		}
 		samples := bytesToFloat32(buf[:n])
 
-		segments, err := sd.DetectStream(samples)
-		if err != nil {
-			log.Fatal(err)
+		segments, detectErr := sd.DetectStream(samples)
+		if detectErr != nil {
+			log.Fatal(detectErr)
 		}
 
 		for _, seg := range segments {
@@ -87,7 +87,7 @@ func main() {
 			fmt.Printf("speech end: %.3fs (start %.3fs)\n", seg.SpeechEndAt, seg.SpeechStartAt)
 		}
 
-		if err == io.EOF || err == io.ErrUnexpectedEOF {
+		if readErr == io.EOF || readErr == io.ErrUnexpectedEOF {
 			break
 		}
 	}
