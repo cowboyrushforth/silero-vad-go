@@ -10,6 +10,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func readSamplesFromFile(t *testing.T, path string) []float32 {
+	t.Helper()
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+
+	samples := make([]float32, 0, len(data)/4)
+	for i := 0; i < len(data); i += 4 {
+		samples = append(samples, math.Float32frombits(binary.LittleEndian.Uint32(data[i:i+4])))
+	}
+	return samples
+}
+
 func TestDetectorConfigIsValid(t *testing.T) {
 	tcs := []struct {
 		name string
@@ -117,19 +130,8 @@ func TestSpeechDetection(t *testing.T) {
 		require.NoError(t, sd.Destroy())
 	}()
 
-	readSamplesFromFile := func(path string) []float32 {
-		data, err := os.ReadFile(path)
-		require.NoError(t, err)
-
-		samples := make([]float32, 0, len(data)/4)
-		for i := 0; i < len(data); i += 4 {
-			samples = append(samples, math.Float32frombits(binary.LittleEndian.Uint32(data[i:i+4])))
-		}
-		return samples
-	}
-
-	samples := readSamplesFromFile("../testfiles/samples.pcm")
-	samples2 := readSamplesFromFile("../testfiles/samples2.pcm")
+	samples := readSamplesFromFile(t, "../testfiles/samples.pcm")
+	samples2 := readSamplesFromFile(t, "../testfiles/samples2.pcm")
 
 	t.Run("detect", func(t *testing.T) {
 		segments, err := sd.Detect(samples)
@@ -218,4 +220,56 @@ func TestSpeechDetection(t *testing.T) {
 			},
 		}, segments)
 	})
+}
+
+func TestDetectStream(t *testing.T) {
+	cfg := DetectorConfig{
+		ModelPath:  "../testfiles/silero_vad.onnx",
+		SampleRate: 16000,
+		Threshold:  0.5,
+	}
+
+	sd, err := NewDetector(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, sd)
+	defer func() {
+		require.NoError(t, sd.Destroy())
+	}()
+
+	samples := readSamplesFromFile(t, "../testfiles/samples.pcm")
+	chunkSize := 1000
+
+	var events []Segment
+	for i := 0; i < len(samples); i += chunkSize {
+		end := i + chunkSize
+		if end > len(samples) {
+			end = len(samples)
+		}
+		segments, err := sd.DetectStream(samples[i:end])
+		require.NoError(t, err)
+		events = append(events, segments...)
+	}
+
+	require.Equal(t, []Segment{
+		{
+			SpeechStartAt: 1.056,
+			SpeechEndAt:   0,
+		},
+		{
+			SpeechStartAt: 1.056,
+			SpeechEndAt:   1.632,
+		},
+		{
+			SpeechStartAt: 2.88,
+			SpeechEndAt:   0,
+		},
+		{
+			SpeechStartAt: 2.88,
+			SpeechEndAt:   3.232,
+		},
+		{
+			SpeechStartAt: 4.448,
+			SpeechEndAt:   0,
+		},
+	}, events)
 }
